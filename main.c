@@ -28,6 +28,8 @@ AGPLv3+ and NO WARRANTY!
 #define APP_VERSION 2
 #endif
 
+
+#define DEBUG 1
 #define CHUNK_VERBOSE 1 // show current chunk being made
 
 #define SZ_CHUNK_OUTPUT_MB 4 // 4MB seems to be the default, but Pulseview won't complain even for 100MB and it makes this tool (a little) faster
@@ -88,18 +90,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	uint8_t compression_ratio=99;
-	
+	uint8_t compress_level=0;
 	if(argc==4)
 	{
-		compression_ratio=atoi(argv[3]);
-		if(compression_ratio<1 || compression_ratio>9)
-			errx(1, "invalid compression ratio or not a number");
+		compress_level=atoi(argv[3]);
+		if(compress_level<0 || compress_level>9)
+			errx(1, "invalid compression level (0-9)");
 	}
-	else
-		compression_ratio=0; //default
 	
-	printf("input file: \"%s\"\noutput file: \"%s\"\ncompression_ratio: %u\n\n", argv[1], argv[2], compression_ratio);
+	printf("input file: \"%s\"\noutput file: \"%s\"\ncompression level: %u\n\n", argv[1], argv[2], compress_level);
 	
 	zip_t * input=open_zip_file(argv[1]);
 	
@@ -130,7 +129,7 @@ int main(int argc, char **argv)
 			found_entry[ENTRY_TOTAL_SAMPLES]=true;
 		else if(sscanf(line, "total blocks = %" SCNu64, &total_blocks)==1)
 			found_entry[ENTRY_TOTAL_BLOCKS]=true;
-		else if(sscanf(line, "probe%hu = %[^NULL]", &probe_number, probe_name)==2)
+		else if(sscanf(line, "probe%hu = %s", &probe_number, probe_name)==2)
 			strlcpy(probe_names[probe_number], probe_name, MAX_LENGTH_PROBE_NAME);
 	} while((line=strtok(NULL, "\n")));
 	
@@ -153,7 +152,7 @@ int main(int argc, char **argv)
 	zip_t * output=create_zip_file(argv[2]);
 	
 	char version[1]={'2'};
-	add_buffer_to_zip_file(output, "version", version, 1, compression_ratio);
+	add_buffer_to_zip_file(output, "version", version, 1, compress_level);
 	
 	char * metadata=malloc(SZ_METADATA);
 	
@@ -167,14 +166,16 @@ int main(int argc, char **argv)
 	for(i=0; i<total_probes; i++)
 	{
 		sprintf(channel, "probe%u=%s\n", i+1, probe_names[i]);
-		printf("%lu/%u : %s",sizeof(channels),SZ_CHANNELS,channel);
+#if DEBUG
+		printf("%s", channel);
+#endif
 		strcat(channels, channel);
 	}
 	
 	strcat(metadata, channels);
 	strcat(metadata, unitsize_str);
 	
-	add_buffer_to_zip_file(output, "metadata", metadata, strlen(metadata), compression_ratio);
+	add_buffer_to_zip_file(output, "metadata", metadata, strlen(metadata), compress_level);
 	
 	uint64_t samples_per_output_chunk=(SZ_CHUNK_OUTPUT_BYTES)/unitsize;
 	uint64_t nb_chunks_output=ceil((double)total_samples/samples_per_output_chunk);
@@ -240,7 +241,7 @@ int main(int argc, char **argv)
 		}
 		
 		sprintf(chunkname, "logic-1-%" PRIu64, chunk);
-		add_buffer_to_zip_file(output, chunkname, chunkdata_arr[chunk-1], unitsize*sample_in_chunk, compression_ratio);
+		add_buffer_to_zip_file(output, chunkname, chunkdata_arr[chunk-1], unitsize*sample_in_chunk, compress_level);
 	}
 
 #if CHUNK_VERBOSE
