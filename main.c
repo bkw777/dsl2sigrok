@@ -65,7 +65,16 @@ typedef struct
 
 void print_usage(void)
 {
-	printf("usage: %s $input_file $output_file [$compression_ratio]\n$compression_ratio is optional and must be between 1 and 9 (fastest to best compression)\n",args[0]);
+	printf(
+		APP_NAME" converts logic analyzer session data from DSLogic to Sigrok.\n"
+		"\n"
+		"Usage: %s input.dsl output.sr [compression_level]\n"
+		"\n"
+		"  input.dsl\t\tSource *.dsl file saved from DSView\n"
+		"  output.sr\t\tDestination *.sr file for PulseView\n"
+		"  compression_level\tOptional zip compression level 1-9\n"
+		"\n"
+		,args[0]);
 }
 
 int main(int argc, char **argv)
