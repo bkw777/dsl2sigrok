@@ -55,6 +55,8 @@ AGPLv3+ and NO WARRANTY!
 
 #define SZ_CHUNK_OUTPUT_BYTES (SZ_CHUNK_OUTPUT_MB*1024*1024)
 
+char** args;
+
 typedef struct
 {
 	uint64_t block;
@@ -63,11 +65,12 @@ typedef struct
 
 void print_usage(void)
 {
-	printf("usage: dsl2sigrok $input_file $output_file [$compression_ratio]\n$compression_ratio is optional and must be between 1 and 9 (fastest to best compression)\n");
+	printf("usage: %s $input_file $output_file [$compression_ratio]\n$compression_ratio is optional and must be between 1 and 9 (fastest to best compression)\n",args[0]);
 }
 
 int main(int argc, char **argv)
 {
+	args = argv;
 	printf(APP_NAME" "APP_VERSION" (c)2022 by kittennbfive\nThis tool is released under AGPLv3+ and comes WITHOUT ANY WARRANTY!\n\n");
 	
 	if(argc!=3 && argc!=4)
