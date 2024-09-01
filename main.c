@@ -21,17 +21,30 @@ WARNING: Depending on your input file this tool can eat quite a lot of RAM.
 AGPLv3+ and NO WARRANTY!
 */
 
-#define CHUNK_VERBOSE 0 //show current chunk being made
+#ifndef APP_NAME
+#define APP_NAME "dsl2sigrock"
+#endif
+#ifndef APP_VERSION
+#define APP_VERSION 2
+#endif
 
-#define SZ_CHUNK_OUTPUT_MB 4 //4MB seems to be the default, but Pulseview won't complain even for 100MB and it makes this tool (a little) faster
+#define CHUNK_VERBOSE 1 // show current chunk being made
 
-#define MAX_PROBES 32 //should be enough...
+#define SZ_CHUNK_OUTPUT_MB 4 // 4MB seems to be the default, but Pulseview won't complain even for 100MB and it makes this tool (a little) faster
 
-#define MAX_LENGTH_PROBE_NAME 50 //should be enough but you can always increase this...
+#define MAX_PROBES 32
 
-#define SZ_METADATA 500 //value?
+#define MAX_LENGTH_PROBE_NAME 256 // DSView allows at least 20k, so pick an arbitrary limit, teeny font filling a wide screen...
 
-#define SZ_CHANNELS 500 //value?
+// "probe%-.2u=%s\n"
+#define SZ_CHANNEL_STR (16+MAX_LENGTH_PROBE_NAME)
+#define SZ_CHANNELS (SZ_CHANNEL_STR*MAX_PROBES)
+
+// "unitsize=%u\n"
+#define SZ_UNITSZ_STR 16
+
+// "[device 1]\ncapturefile=logic-1\ntotal probes=%u\nsamplerate=%s\ntotal analog=0\n"
+#define SZ_METADATA (128+SZ_CHANNELS+SZ_UNITSZ_STR)
 
 //-- do not change anything below this line --
 
@@ -55,7 +68,7 @@ void print_usage(void)
 
 int main(int argc, char **argv)
 {
-	printf("This is dsl2sigrok version 2 (c)2022 by kittennbfive\nThis tool is released under AGPLv3+ and comes WITHOUT ANY WARRANTY!\n\n");
+	printf(APP_NAME" "APP_VERSION" (c)2022 by kittennbfive\nThis tool is released under AGPLv3+ and comes WITHOUT ANY WARRANTY!\n\n");
 	
 	if(argc!=3 && argc!=4)
 	{
@@ -106,7 +119,7 @@ int main(int argc, char **argv)
 		else if(sscanf(line, "total blocks = %" SCNu64, &total_blocks)==1)
 			found_entry[ENTRY_TOTAL_BLOCKS]=true;
 		else if(sscanf(line, "probe%hu = %[^NULL]", &probe_number, probe_name)==2)
-			strncpy(probe_names[probe_number], probe_name, MAX_LENGTH_PROBE_NAME);
+			strlcpy(probe_names[probe_number], probe_name, MAX_LENGTH_PROBE_NAME);
 	} while((line=strtok(NULL, "\n")));
 	
 	if(!found_entry[ENTRY_TOTAL_PROBES])
@@ -119,7 +132,7 @@ int main(int argc, char **argv)
 		errx(1, "total number of blocks not found in header");
 	
 	uint8_t unitsize=(total_probes+7)/8;
-	char unitsize_str[20];
+	char unitsize_str[SZ_UNITSZ_STR];
 	sprintf(unitsize_str, "unitsize=%u\n", unitsize);
 	
 	printf("Header of input file successfully parsed.\n");
@@ -133,15 +146,16 @@ int main(int argc, char **argv)
 	char * metadata=malloc(SZ_METADATA);
 	
 	sprintf(metadata, "[device 1]\ncapturefile=logic-1\ntotal probes=%u\nsamplerate=%s\ntotal analog=0\n", total_probes, samplerate);
-	
-	char channel[12+MAX_LENGTH_PROBE_NAME];
+
+	char channel[SZ_CHANNEL_STR];
 	char * channels=malloc(SZ_CHANNELS);
-	memset(channels, '\0', SZ_CHANNELS);
+	memset(channels, 0, SZ_CHANNELS);
 	
 	uint16_t i;
 	for(i=0; i<total_probes; i++)
 	{
 		sprintf(channel, "probe%u=%s\n", i+1, probe_names[i]);
+		printf("%lu/%u : %s",sizeof(channels),SZ_CHANNELS,channel);
 		strcat(channels, channel);
 	}
 	
@@ -181,10 +195,10 @@ int main(int argc, char **argv)
 	for(chunk=1; chunk<=nb_chunks_output; chunk++)
 	{
 #if CHUNK_VERBOSE
-		printf("creating chunk %lu\r", chunk); fflush(stdout);
+		printf("\rcreating chunk %lu", chunk); fflush(stdout);
 #endif
 		chunkdata_arr[chunk-1]=malloc(SZ_CHUNK_OUTPUT_BYTES);	
-		memset(chunkdata_arr[chunk-1], 0x00, SZ_CHUNK_OUTPUT_BYTES);
+		memset(chunkdata_arr[chunk-1], 0, SZ_CHUNK_OUTPUT_BYTES);
 		
 		for(probe=0; probe<total_probes; probe++)
 		{

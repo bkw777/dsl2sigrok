@@ -1,1 +1,4 @@
 dsl2sigrok
+*.dsl
+*.sr
+*.o
